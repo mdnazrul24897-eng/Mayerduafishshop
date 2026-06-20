@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<title>Fish Shop POS</title>
+
+<style>
+body{
+    font-family: Arial;
+    background:#f8f8f8;
+}
+
+#app, #loginBox{
+    max-width:600px;
+    margin:20px auto;
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 0 10px #ddd;
+}
+
+button{
+    padding:8px 12px;
+    margin:5px;
+    cursor:pointer;
+}
+
+/* PRINT STYLE */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+
+    #printArea, #printArea * {
+        visibility: visible;
+    }
+
+    #printArea {
+        position:absolute;
+        left:0;
+        top:0;
+        width:100%;
+    }
+
+    button, input, select {
+        display:none !important;
+    }
+}
+</style>
+
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="loginBox">
+    <h2>🔐 Login</h2>
+
+    <input id="username" placeholder="Username"><br><br>
+    <input id="password" type="password" placeholder="Password"><br><br>
+
+    <button onclick="login()">Login</button>
+    <p id="loginMsg"></p>
+
+    <hr>
+
+    <h3>🔑 Change Password</h3>
+    <button onclick="togglePass()">Open</button>
+
+    <div id="passBox" style="display:none;">
+        <input id="oldPass" type="password" placeholder="Old Password"><br><br>
+        <input id="newPass" type="password" placeholder="New Password"><br><br>
+        <button onclick="changePassword()">Save</button>
+        <p id="passMsg"></p>
+    </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none;">
+
+<h2>🐟 Fish Shop</h2>
+
+<select id="fish">
+    <option value="ruhi">রুই</option>
+    <option value="katla">কাতলা</option>
+    <option value="ilish">ইলিশ</option>
+</select>
+
+<button onclick="selectFish()">Select</button>
+
+<hr>
+
+<h4>Price</h4>
+<input id="priceInput" type="number">
+<button onclick="updatePrice()">Update</button>
+
+<hr>
+
+<h3>Weight: <span id="weight">1.0</span> kg</h3>
+<button onclick="changeWeight(-0.5)">-</button>
+<button onclick="changeWeight(0.5)">+</button>
+
+<hr>
+
+<h3>Total: ৳<span id="total">0</span></h3>
+
+<button onclick="placeOrder()">Order</button>
+<button onclick="window.print()">🖨️ Print</button>
+
+<hr>
+
+<!-- PRINT AREA -->
+<div id="printArea">
+    <h3>📦 Orders</h3>
+    <div id="orders"></div>
+</div>
+
+</div>
+
+<script>
+
+/* DATA */
+let weight = 1;
+let selectedFish = "ruhi";
+let isAdmin = false;
+
+let prices = JSON.parse(localStorage.getItem("prices")) || {
+    ruhi:300,
+    katla:350,
+    ilish:1200
+};
+
+let orders = JSON.parse(localStorage.getItem("orders")) || [];
+
+let adminPassword = localStorage.getItem("adminPassword") || "1234";
+
+/* ELEMENTS */
+const usernameEl = document.getElementById("username");
+const passwordEl = document.getElementById("password");
+const fishEl = document.getElementById("fish");
+const priceInputEl = document.getElementById("priceInput");
+
+const loginMsgEl = document.getElementById("loginMsg");
+const passMsgEl = document.getElementById("passMsg");
+
+const weightEl = document.getElementById("weight");
+const totalEl = document.getElementById("total");
+const ordersDiv = document.getElementById("orders");
+
+const loginBoxEl = document.getElementById("loginBox");
+const appEl = document.getElementById("app");
+const passBoxEl = document.getElementById("passBox");
+
+/* LOGIN */
+function login(){
+    let u = usernameEl.value;
+    let p = passwordEl.value;
+
+    if(u==="admin" && p===adminPassword){
+        isAdmin = true;
+        loginBoxEl.style.display="none";
+        appEl.style.display="block";
+        renderOrders();
+        calculate();
+    }else{
+        loginMsgEl.innerText="Wrong login!";
+        loginMsgEl.style.color="red";
+    }
+}
+
+/* TOGGLE PASSWORD */
+function togglePass(){
+    passBoxEl.style.display = (passBoxEl.style.display==="none") ? "block" : "none";
+}
+
+/* FISH */
+function selectFish(){
+    selectedFish = fishEl.value;
+    calculate();
+}
+
+/* WEIGHT */
+function changeWeight(v){
+    weight = Math.max(0.5, weight + v);
+    calculate();
+}
+
+/* PRICE */
+function updatePrice(){
+    if(!isAdmin) return alert("Admin only");
+
+    let p = Number(priceInputEl.value);
+    if(p>0){
+        prices[selectedFish]=p;
+        localStorage.setItem("prices",JSON.stringify(prices));
+        calculate();
+        alert("Updated");
+    }
+}
+
+/* CALCULATE */
+function calculate(){
+    let total = prices[selectedFish]*weight;
+    totalEl.innerText = total.toFixed(0);
+    weightEl.innerText = weight.toFixed(1);
+}
+
+/* ORDER */
+function placeOrder(){
+    let o = {
+        id:Date.now(),
+        fish:selectedFish,
+        weight,
+        total:prices[selectedFish]*weight,
+        time:new Date().toLocaleString()
+    };
+
+    orders.push(o);
+    localStorage.setItem("orders",JSON.stringify(orders));
+    renderOrders();
+}
+
+/* RENDER */
+function renderOrders(){
+    let html="";
+
+    orders.forEach(o=>{
+        html+=`
+        <div style="margin:10px;padding:10px;background:#f1f1f1;border-radius:8px;">
+            🐟 ${o.fish}<br>
+            ⚖️ ${o.weight} kg<br>
+            💰 ৳${o.total}<br>
+            🕒 ${o.time}<br>
+        </div>`;
+    });
+
+    ordersDiv.innerHTML=html;
+}
+
+/* PASSWORD CHANGE */
+function changePassword(){
+    if(!isAdmin) return;
+
+    if(oldPass.value!==adminPassword){
+        passMsgEl.innerText="Wrong old password";
+        return;
+    }
+
+    if(newPass.value.length<4){
+        passMsgEl.innerText="Too short password";
+        return;
+    }
+
+    adminPassword=newPass.value;
+    localStorage.setItem("adminPassword",adminPassword);
+
+    passMsgEl.innerText="Password changed!";
+}
+
+/* INIT */
+calculate();
+renderOrders();
+
+</script>
+
+</body>
+</html>
